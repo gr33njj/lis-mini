@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ЛИС МД - Система управления лабораторными результатами{% endblock %}</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .htmx-indicator {
+            opacity: 0;
+            transition: opacity 0.3s ease-in;
+        }
+        .htmx-request .htmx-indicator {
+            opacity: 1;
+        }
+        .htmx-request.htmx-indicator {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-800">ЛИС МД</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    {% if current_user %}
+                    <span class="text-sm text-gray-600">Привет, {{ current_user.username }}</span>
+                    <a href="/logout" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
+                        Выйти
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="max-w-7xl mx-auto py-6 px-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Loading indicator -->
+    <div class="htmx-indicator fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded shadow-lg">
+        Загрузка...
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Global function to add auth token to requests
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add token to all fetch requests
+            const originalFetch = window.fetch;
+            window.fetch = function(...args) {
+                const token = localStorage.getItem('access_token');
+                if (token && args[1] && !args[1].headers) {
+                    args[1].headers = {};
+                }
+                if (token && args[1] && args[1].headers) {
+                    args[1].headers['Authorization'] = `Bearer ${token}`;
+                }
+                return originalFetch(...args);
+            };
+
+            // Add token to HTMX requests
+            document.body.addEventListener('htmx:beforeRequest', function(event) {
+                const token = localStorage.getItem('access_token');
+                if (token) {
+                    event.detail.xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            });
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

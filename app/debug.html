@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отладка ЛИС МД</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        button { padding: 8px 16px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Отладка системы ЛИС МД</h1>
+
+    <div class="test">
+        <h3>Шаг 1: Проверка JavaScript</h3>
+        <button onclick="testJS()">Проверить JavaScript</button>
+        <div id="js-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Шаг 2: Проверка API логина</h3>
+        <button onclick="testLoginAPI()">Тестировать логин API</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Шаг 3: Проверка страницы логина</h3>
+        <button onclick="testLoginPage()">Открыть страницу логина</button>
+        <div id="page-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Шаг 4: Диагностика сети</h3>
+        <button onclick="testNetwork()">Проверить сетевые запросы</button>
+        <div id="network-result"></div>
+    </div>
+
+    <div class="test">
+        <h3>Шаг 5: Проверка токенов</h3>
+        <button onclick="checkToken()">Проверить токен в localStorage</button>
+        <button onclick="clearToken()">Очистить токен</button>
+        <div id="token-result"></div>
+    </div>
+
+    <script>
+        function testJS() {
+            const result = document.getElementById('js-result');
+            result.innerHTML = '<div class="success">✅ JavaScript работает!</div>';
+        }
+
+        async function testLoginAPI() {
+            const result = document.getElementById('login-result');
+            result.innerHTML = '<div class="warning">⏳ Отправка запроса...</div>';
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'changeme' })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    result.innerHTML = `<div class="success">✅ Логин успешен! Токен: ${data.access_token.substring(0, 50)}...</div>`;
+                    localStorage.setItem('access_token', data.access_token);
+                } else {
+                    result.innerHTML = `<div class="error">❌ Ошибка: ${response.status}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Ошибка сети: ${error.message}</div>`;
+            }
+        }
+
+        function testLoginPage() {
+            const result = document.getElementById('page-result');
+            window.open('/login', '_blank');
+            result.innerHTML = '<div class="success">✅ Страница логина открыта в новом окне</div>';
+        }
+
+        async function testNetwork() {
+            const result = document.getElementById('network-result');
+            result.innerHTML = '<div class="warning">⏳ Проверка сети...</div>';
+
+            try {
+                const response = await fetch('/health');
+                if (response.ok) {
+                    result.innerHTML = '<div class="success">✅ Сервер отвечает</div>';
+                } else {
+                    result.innerHTML = `<div class="error">❌ Сервер ошибка: ${response.status}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Нет соединения: ${error.message}</div>`;
+            }
+        }
+
+        function checkToken() {
+            const result = document.getElementById('token-result');
+            const token = localStorage.getItem('access_token');
+
+            if (token) {
+                result.innerHTML = `<div class="success">✅ Токен найден: ${token.substring(0, 50)}...</div>`;
+            } else {
+                result.innerHTML = '<div class="warning">⚠️ Токен отсутствует</div>';
+            }
+        }
+
+        function clearToken() {
+            localStorage.removeItem('access_token');
+            document.getElementById('token-result').innerHTML = '<div class="success">✅ Токен очищен</div>';
+        }
+
+        // Автоматическая проверка при загрузке
+        window.addEventListener('load', function() {
+            testNetwork();
+            checkToken();
+        });
+    </script>
+</body>
+</html>

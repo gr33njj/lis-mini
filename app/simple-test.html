@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Простой тест ЛИС МД</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>🧪 Простой тест ЛИС МД</h1>
+
+    <div id="status">⏳ Загрузка...</div>
+
+    <h2>Шаг 1: Проверка сервера</h2>
+    <button onclick="testServer()">Проверить сервер</button>
+    <div id="server-result"></div>
+
+    <h2>Шаг 2: Проверка JavaScript</h2>
+    <button onclick="testJS()">Проверить JavaScript</button>
+    <div id="js-result"></div>
+
+    <h2>Шаг 3: Проверка localStorage</h2>
+    <button onclick="testStorage()">Проверить localStorage</button>
+    <div id="storage-result"></div>
+
+    <h2>Шаг 4: Полный тест логина</h2>
+    <button onclick="fullTest()">Полный тест логина</button>
+    <div id="full-result"></div>
+
+    <script>
+        async function testServer() {
+            const result = document.getElementById('server-result');
+            try {
+                const response = await fetch('/health');
+                if (response.ok) {
+                    result.innerHTML = '<div style="color: green;">✅ Сервер отвечает</div>';
+                } else {
+                    result.innerHTML = '<div style="color: red;">❌ Сервер ошибка: ' + response.status + '</div>';
+                }
+            } catch (error) {
+                result.innerHTML = '<div style="color: red;">❌ Нет соединения: ' + error.message + '</div>';
+            }
+        }
+
+        function testJS() {
+            const result = document.getElementById('js-result');
+            result.innerHTML = '<div style="color: green;">✅ JavaScript работает!</div>';
+        }
+
+        function testStorage() {
+            const result = document.getElementById('storage-result');
+            try {
+                localStorage.setItem('test', 'value');
+                const value = localStorage.getItem('test');
+                if (value === 'value') {
+                    result.innerHTML = '<div style="color: green;">✅ localStorage работает</div>';
+                } else {
+                    result.innerHTML = '<div style="color: red;">❌ localStorage не работает</div>';
+                }
+                localStorage.removeItem('test');
+            } catch (error) {
+                result.innerHTML = '<div style="color: red;">❌ Ошибка localStorage: ' + error.message + '</div>';
+            }
+        }
+
+        async function fullTest() {
+            const result = document.getElementById('full-result');
+            result.innerHTML = '<div style="color: orange;">⏳ Тестирую логин...</div>';
+
+            try {
+                // Тест 1: Проверка сервера
+                const healthResponse = await fetch('/health');
+                if (!healthResponse.ok) {
+                    result.innerHTML = '<div style="color: red;">❌ Сервер недоступен</div>';
+                    return;
+                }
+
+                // Тест 2: Логин
+                const loginResponse = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'changeme' })
+                });
+
+                if (loginResponse.ok) {
+                    const data = await loginResponse.json();
+                    result.innerHTML = '<div style="color: green;">✅ Логин успешен! Токен получен.</div>';
+
+                    // Тест 3: Сохранение токена
+                    localStorage.setItem('access_token', data.access_token);
+
+                    // Тест 4: Проверка токена
+                    const token = localStorage.getItem('access_token');
+                    if (token) {
+                        result.innerHTML += '<div style="color: green;">✅ Токен сохранен в localStorage</div>';
+
+                        // Тест 5: Доступ к защищенной странице
+                        const protectedResponse = await fetch('/', {
+                            headers: { 'Authorization': 'Bearer ' + token }
+                        });
+
+                        if (protectedResponse.ok) {
+                            result.innerHTML += '<div style="color: green;">✅ Доступ к главной странице получен</div>';
+                        } else {
+                            result.innerHTML += '<div style="color: red;">❌ Нет доступа к главной странице: ' + protectedResponse.status + '</div>';
+                        }
+                    } else {
+                        result.innerHTML += '<div style="color: red;">❌ Токен не сохранен</div>';
+                    }
+                } else {
+                    result.innerHTML = '<div style="color: red;">❌ Логин неудачен: ' + loginResponse.status + '</div>';
+                }
+            } catch (error) {
+                result.innerHTML = '<div style="color: red;">❌ Ошибка сети: ' + error.message + '</div>';
+            }
+        }
+
+        // Автозапуск тестов
+        window.addEventListener('load', function() {
+            document.getElementById('status').innerHTML = '<div style="color: green;">✅ Страница загружена</div>';
+        });
+    </script>
+</body>
+</html>

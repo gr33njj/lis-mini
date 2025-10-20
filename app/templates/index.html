@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script>
+// Check authentication on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
+    // Verify token with server
+    fetch('/api/verify-token', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    }).catch(error => {
+        console.error('Token verification failed:', error);
+        localStorage.removeItem('access_token');
+        window.location.href = '/login';
+    });
+});
+</script>
+<div class="bg-white rounded-lg shadow-md p-6">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Система управления лабораторными результатами</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <!-- Statistics Cards -->
+        <div class="bg-blue-500 text-white rounded-lg p-6 text-center">
+            <h3 class="text-2xl font-bold" id="total-count">{{ stats.total or 0 }}</h3>
+            <p class="text-blue-100">Всего файлов</p>
+        </div>
+        <div class="bg-green-500 text-white rounded-lg p-6 text-center">
+            <h3 class="text-2xl font-bold" id="completed-count">{{ stats.completed or 0 }}</h3>
+            <p class="text-green-100">Обработано</p>
+        </div>
+        <div class="bg-yellow-500 text-white rounded-lg p-6 text-center">
+            <h3 class="text-2xl font-bold" id="pending-count">{{ stats.pending or 0 }}</h3>
+            <p class="text-yellow-100">В обработке</p>
+        </div>
+        <div class="bg-red-500 text-white rounded-lg p-6 text-center">
+            <h3 class="text-2xl font-bold" id="failed-count">{{ stats.failed or 0 }}</h3>
+            <p class="text-red-100">Ошибок</p>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="border-b border-gray-200 mb-6">
+        <nav class="-mb-px flex space-x-8">
+            <a href="#" hx-get="/dashboard" hx-target="#main-content"
+               class="border-blue-500 text-blue-600 whitespace-nowrap py-2 px-1 border-b-2 font-medium">
+                Панель управления
+            </a>
+            <a href="#" hx-get="/records" hx-target="#main-content"
+               class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium">
+                Записи
+            </a>
+            <a href="#" hx-get="/logs" hx-target="#main-content"
+               class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium">
+                Журнал
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content Area -->
+    <div id="main-content">
+        {% include "dashboard.html" %}
+    </div>
+</div>
+
+<script>
+// Auto-refresh statistics every 30 seconds
+setInterval(async () => {
+    try {
+        const response = await fetch('/api/stats');
+        const stats = await response.json();
+
+        document.getElementById('total-count').textContent = stats.total;
+        document.getElementById('completed-count').textContent = stats.completed;
+        document.getElementById('pending-count').textContent = stats.pending;
+        document.getElementById('failed-count').textContent = stats.failed;
+    } catch (error) {
+        console.error('Failed to refresh stats:', error);
+    }
+}, 30000);
+</script>
+{% endblock %}

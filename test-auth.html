@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест аутентификации ЛИС МД</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест аутентификации ЛИС МД</h1>
+
+    <div class="test-section info">
+        <h3>Шаг 1: Логин</h3>
+        <p>Введите данные администратора:</p>
+        <input type="text" id="username" placeholder="admin" value="admin">
+        <input type="password" id="password" placeholder="changeme" value="changeme">
+        <button onclick="testLogin()">Войти</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="test-section" id="step2" style="display: none;">
+        <h3>Шаг 2: Доступ к главной странице</h3>
+        <button onclick="testMainPage()">Проверить главную страницу</button>
+        <div id="main-result"></div>
+    </div>
+
+    <div class="test-section" id="step3" style="display: none;">
+        <h3>Шаг 3: API запросы</h3>
+        <button onclick="testAPI()">Проверить API</button>
+        <div id="api-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Шаг 4: Очистка</h3>
+        <button onclick="clearStorage()">Очистить токен</button>
+        <button onclick="showToken()">Показать токен</button>
+    </div>
+
+    <script>
+        async function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const result = document.getElementById('login-result');
+
+            try {
+                const response = await fetch('http://localhost:8000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('access_token', data.access_token);
+                    result.innerHTML = '<div class="success">✅ Логин успешен! Токен сохранен.</div>';
+                    document.getElementById('step2').style.display = 'block';
+                } else {
+                    result.innerHTML = `<div class="error">❌ Ошибка логина: ${response.status}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Ошибка сети: ${error.message}</div>`;
+            }
+        }
+
+        async function testMainPage() {
+            const result = document.getElementById('main-result');
+
+            try {
+                const response = await fetch('http://localhost:8000/');
+                const html = await response.text();
+
+                if (response.ok && html.includes('ЛИС МД')) {
+                    result.innerHTML = '<div class="success">✅ Главная страница загружается</div>';
+                    document.getElementById('step3').style.display = 'block';
+                } else {
+                    result.innerHTML = '<div class="error">❌ Главная страница не загружается</div>';
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Ошибка сети: ${error.message}</div>`;
+            }
+        }
+
+        async function testAPI() {
+            const result = document.getElementById('api-result');
+
+            try {
+                const response = await fetch('http://localhost:8000/api/stats');
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `<div class="success">✅ API работает! Статистика: ${JSON.stringify(data)}</div>`;
+                } else {
+                    result.innerHTML = `<div class="error">❌ API ошибка: ${response.status}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Ошибка сети: ${error.message}</div>`;
+            }
+        }
+
+        function clearStorage() {
+            localStorage.removeItem('access_token');
+            location.reload();
+        }
+
+        function showToken() {
+            const token = localStorage.getItem('access_token');
+            alert(token ? `Токен: ${token.substring(0, 50)}...` : 'Токен отсутствует');
+        }
+    </script>
+</body>
+</html>

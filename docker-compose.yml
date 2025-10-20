@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  app:
+    build: ./app
+    container_name: lis-md-app
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app
+      - /mnt/nas:/mnt/nas
+      - ./data:/data
+    environment:
+      - DATABASE_URL=sqlite:////data/lis.db
+      - NAS_WATCH_PATH=/mnt/nas/lab_results
+      - NAS_ARCHIVE_PATH=/mnt/nas/archive
+      - NAS_QUARANTINE_PATH=/mnt/nas/quarantine
+      - API_1C_URL=${API_1C_URL:-https://1c.example.ru/lab/attachResult}
+      - API_1C_TOKEN=${API_1C_TOKEN:-}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-noreply@it-mydoc.ru}
+      - SECRET_KEY=${SECRET_KEY:-changeme-secret-key-for-production}
+    depends_on:
+      - nginx
+    networks:
+      - lis-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: lis-md-nginx
+    restart: always
+    network_mode: host
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./static:/var/www/static:ro
+
+networks:
+  lis-network:
+    driver: bridge
+
