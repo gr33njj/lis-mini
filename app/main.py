@@ -21,6 +21,7 @@ from config import settings
 from watcher import start_watcher
 from integrator import start_integrator, send_to_1c
 from mailer import send_email
+from housekeeping import start_housekeeping
 
 app = FastAPI(title="ЛИС МД", description="Система управления лабораторными результатами")
 
@@ -74,6 +75,7 @@ async def startup():
     # Start background tasks
     await start_watcher()
     await start_integrator()
+    await start_housekeeping()
     print("✓ Background services started")
 
     print("✓ ЛИС МД started successfully!")
