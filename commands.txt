@@ -1,0 +1,38 @@
+# Быстрые команды для работы с ЛИС МД
+
+# Диагностика системы
+./diagnostic.sh
+
+# Тестирование локально
+curl http://127.0.0.1:8000/test.html
+
+# Доступ к веб-интерфейсу (через SSH)
+# ssh root@185.247.185.147
+# curl http://localhost:8000/login
+
+# Отправка на GitHub (после настройки токена)
+./push-to-github.sh
+
+# Проверка git статуса
+git status
+
+# Добавление изменений
+git add .
+
+# Коммит изменений
+git commit -m "Описание изменений"
+
+# Отправка на GitHub
+git push
+
+# Проверка логов приложения
+docker logs lis-md-app
+
+# Перезапуск сервиса
+docker restart lis-md-app
+
+# Остановка всех контейнеров
+docker-compose down
+
+# Запуск всех сервисов
+docker-compose up -d
