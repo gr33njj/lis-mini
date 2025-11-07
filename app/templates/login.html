@@ -66,8 +66,8 @@ document.getElementById('login-form').addEventListener('submit', async function(
             const data = await response.json();
             // Store token in localStorage or sessionStorage
             localStorage.setItem('access_token', data.access_token);
-            // Redirect to main page
-            window.location.href = '/';
+            // Redirect to dashboard
+            window.location.href = '/dashboard';
         } else if (response.status === 401) {
             errorDiv.textContent = 'Неверное имя пользователя или пароль';
             errorDiv.classList.remove('hidden');

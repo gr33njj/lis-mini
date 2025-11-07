@@ -4,8 +4,9 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import FastAPI, Depends, HTTPException, Request, Form, status
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.security import HTTPBearer
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, desc
@@ -26,6 +27,31 @@ app = FastAPI(title="ЛИС МД", description="Система управлен�
 
 # Setup templates
 templates = Jinja2Templates(directory="templates")
+
+# Exception handlers for unauthorized access
+@app.exception_handler(401)
+async def unauthorized_exception_handler(request: Request, exc: FastAPIHTTPException):
+    """Redirect to login page for HTML requests when unauthorized."""
+    # Check if this is a page request (not API)
+    if not request.url.path.startswith("/api/"):
+        return RedirectResponse(url="/login", status_code=302)
+    # For API requests, return JSON error
+    return JSONResponse(
+        status_code=401,
+        content={"detail": "Not authenticated"}
+    )
+
+@app.exception_handler(403)
+async def forbidden_exception_handler(request: Request, exc: FastAPIHTTPException):
+    """Redirect to login page for HTML requests when forbidden (no token)."""
+    # Check if this is a page request (not API)
+    if not request.url.path.startswith("/api/"):
+        return RedirectResponse(url="/login", status_code=302)
+    # For API requests, return JSON error
+    return JSONResponse(
+        status_code=403,
+        content={"detail": "Not authenticated"}
+    )
 
 # Ensure directories exist
 Path("/data").mkdir(exist_ok=True)
@@ -353,39 +379,20 @@ async def get_current_user_optional(
     return user if user else None
 
 # Web UI endpoints
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Main page."""
-    # Get stats for dashboard
-    total = await db.execute(select(func.count(FileRecord.id)))
-    total_count = total.scalar()
+@app.get("/")
+async def root():
+    """Redirect to login page."""
+    return RedirectResponse(url="/login", status_code=302)
 
-    completed = await db.execute(
-        select(func.count(FileRecord.id)).where(FileRecord.status == "completed")
-    )
-    completed_count = completed.scalar()
 
-    failed = await db.execute(
-        select(func.count(FileRecord.id)).where(FileRecord.status == "failed")
-    )
-    failed_count = failed.scalar()
-
-    pending = await db.execute(
-        select(func.count(FileRecord.id)).where(FileRecord.status == "pending")
-    )
-    pending_count = pending.scalar()
-
-    stats = {
-        "total": total_count,
-        "completed": completed_count,
-        "failed": failed_count,
-        "pending": pending_count
-    }
-
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(request: Request):
+    """Main dashboard page - auth check done in JavaScript."""
+    # Return page without auth check - JS will handle token validation
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "stats": stats,
-        "current_user": current_user
+        "stats": {"total": 0, "completed": 0, "failed": 0, "pending": 0},
+        "current_user": None
     })
 
 
@@ -393,12 +400,6 @@ async def index(request: Request, db: AsyncSession = Depends(get_db), current_us
 async def login_page(request: Request):
     """Login page."""
     return templates.TemplateResponse("login.html", {"request": request})
-
-
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    """Dashboard page."""
-    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
 # Health check

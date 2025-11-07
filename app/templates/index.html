@@ -2,8 +2,8 @@
 
 {% block content %}
 <script>
-// Check authentication on page load
-document.addEventListener('DOMContentLoaded', function() {
+// Check authentication and load stats on page load
+document.addEventListener('DOMContentLoaded', async function() {
     const token = localStorage.getItem('access_token');
     if (!token) {
         window.location.href = '/login';
@@ -11,18 +11,73 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Verify token with server
-    fetch('/api/verify-token', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+    try {
+        const verifyResponse = await fetch('/api/verify-token', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!verifyResponse.ok) {
+            localStorage.removeItem('access_token');
+            window.location.href = '/login';
+            return;
         }
-    }).catch(error => {
+        
+        // Get user info
+        const userData = await verifyResponse.json();
+        
+        // Show user menu
+        const userMenu = document.getElementById('user-menu');
+        if (userMenu && userData.username) {
+            userMenu.innerHTML = `
+                <span class="text-sm text-gray-600">Привет, ${userData.username}</span>
+                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
+                    Выйти
+                </button>
+            `;
+        }
+        
+        // Load initial stats
+        await loadStats();
+    } catch (error) {
         console.error('Token verification failed:', error);
         localStorage.removeItem('access_token');
         window.location.href = '/login';
-    });
+    }
 });
+
+// Function to logout
+function logout() {
+    localStorage.removeItem('access_token');
+    window.location.href = '/login';
+}
+
+// Function to load stats
+async function loadStats() {
+    try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch('/api/stats', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load stats');
+        }
+        
+        const stats = await response.json();
+        document.getElementById('total-count').textContent = stats.total;
+        document.getElementById('completed-count').textContent = stats.completed;
+        document.getElementById('pending-count').textContent = stats.pending;
+        document.getElementById('failed-count').textContent = stats.failed;
+    } catch (error) {
+        console.error('Failed to load stats:', error);
+    }
+}
 </script>
 <div class="bg-white rounded-lg shadow-md p-6">
     <h1 class="text-3xl font-bold text-gray-800 mb-6">Система управления лабораторными результатами</h1>
@@ -73,18 +128,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script>
 // Auto-refresh statistics every 30 seconds
-setInterval(async () => {
-    try {
-        const response = await fetch('/api/stats');
-        const stats = await response.json();
-
-        document.getElementById('total-count').textContent = stats.total;
-        document.getElementById('completed-count').textContent = stats.completed;
-        document.getElementById('pending-count').textContent = stats.pending;
-        document.getElementById('failed-count').textContent = stats.failed;
-    } catch (error) {
-        console.error('Failed to refresh stats:', error);
-    }
+setInterval(() => {
+    loadStats();
 }, 30000);
 </script>
 {% endblock %}

@@ -1,0 +1,44 @@
+# Environment variables
+.env
+.env.local
+
+# Credentials
+.nas-credentials
+CREDENTIALS.txt
+*.pem
+*.ovpn
+
+# Database
+data/
+*.db
+*.db-journal
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Docker
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup

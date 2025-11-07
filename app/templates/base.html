@@ -33,13 +33,8 @@
                 <div class="flex items-center">
                     <h1 class="text-xl font-bold text-gray-800">ЛИС МД</h1>
                 </div>
-                <div class="flex items-center space-x-4">
-                    {% if current_user %}
-                    <span class="text-sm text-gray-600">Привет, {{ current_user.username }}</span>
-                    <a href="/logout" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
-                        Выйти
-                    </a>
-                    {% endif %}
+                <div class="flex items-center space-x-4" id="user-menu">
+                    <!-- Will be filled by JavaScript if authenticated -->
                 </div>
             </div>
         </div>
