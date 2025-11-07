@@ -402,6 +402,18 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
+@app.get("/records", response_class=HTMLResponse)
+async def records_page(request: Request):
+    """Records page - auth check done in JavaScript."""
+    return templates.TemplateResponse("records.html", {"request": request})
+
+
+@app.get("/logs", response_class=HTMLResponse)
+async def logs_page(request: Request):
+    """Logs page - auth check done in JavaScript."""
+    return templates.TemplateResponse("logs.html", {"request": request})
+
+
 # Health check
 @app.get("/health")
 async def health():

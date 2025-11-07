@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script>
+// Check authentication
+document.addEventListener('DOMContentLoaded', async function() {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+    
+    // Verify token
+    try {
+        const verifyResponse = await fetch('/api/verify-token', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!verifyResponse.ok) {
+            localStorage.removeItem('access_token');
+            window.location.href = '/login';
+            return;
+        }
+        
+        const userData = await verifyResponse.json();
+        
+        // Show user menu
+        const userMenu = document.getElementById('user-menu');
+        if (userMenu && userData.username) {
+            userMenu.innerHTML = `
+                <span class="text-sm text-gray-600">Привет, ${userData.username}</span>
+                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
+                    Выйти
+                </button>
+            `;
+        }
+        
+        // Load records
+        await loadRecords();
+    } catch (error) {
+        console.error('Token verification failed:', error);
+        localStorage.removeItem('access_token');
+        window.location.href = '/login';
+    }
+});
+
+function logout() {
+    localStorage.removeItem('access_token');
+    window.location.href = '/login';
+}
+
+async function loadRecords() {
+    const token = localStorage.getItem('access_token');
+    try {
+        const response = await fetch('/api/records?limit=100', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to load records');
+        
+        const records = await response.json();
+        displayRecords(records);
+    } catch (error) {
+        console.error('Failed to load records:', error);
+        document.getElementById('records-list').innerHTML = `
+            <div class="text-center text-red-600">
+                Ошибка загрузки записей: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function displayRecords(records) {
+    const container = document.getElementById('records-list');
+    
+    if (records.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <p class="text-lg">Нет записей</p>
+                <p class="text-sm mt-2">Файлы будут отображаться здесь после обработки</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = records.map(record => `
+        <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.id}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.order_no || 'N/A'}</td>
+            <td class="px-6 py-4 text-sm text-gray-900">${record.file_name}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                    ${record.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
+                    ${record.status === 'failed' ? 'bg-red-100 text-red-800' : ''}
+                    ${record.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : ''}
+                ">
+                    ${record.status}
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                ${record.sent_to_1c ? '✅' : '❌'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                ${record.email_sent ? '✅' : '❌'}
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-500">
+                ${new Date(record.created_at).toLocaleString('ru-RU')}
+            </td>
+        </tr>
+    `).join('');
+}
+</script>
+
+<div class="bg-white rounded-lg shadow-md p-6">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Записи файлов</h1>
+    
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <a href="/dashboard" class="text-blue-600 hover:text-blue-800 text-sm">← Назад к панели</a>
+        </div>
+        <button onclick="loadRecords()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
+            🔄 Обновить
+        </button>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">№ Заказа</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Файл</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">В 1С</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200" id="records-list">
+                <tr>
+                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                        <div class="animate-pulse">Загрузка...</div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
