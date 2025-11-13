@@ -1,9 +1,9 @@
 """1C Integration module."""
 import asyncio
 import base64
+import shutil
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -119,9 +119,10 @@ async def archive_file(record: FileRecord, db: AsyncSession):
         
         # Move file
         destination = archive_dir / record.file_name
-        source.rename(destination)
-        
+        shutil.move(str(source), str(destination))
+
         record.archived_at = datetime.utcnow()
+        record.file_path = str(destination)
         await db.commit()
         
         await log_audit(
