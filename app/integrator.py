@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import FileRecord, AuditLog, SessionLocal
 from config import settings
 from watcher import log_audit
+from pdf_parser import parse_lab_result_pdf
+from integrator_1c import get_1c_integrator
 
 
 async def send_to_1c(
@@ -18,9 +20,12 @@ async def send_to_1c(
     db: AsyncSession,
     retry_count: int = 0
 ) -> bool:
-    """Send file to 1C via HTTP API."""
+    """
+    Parse PDF and send data to 1C via HTTP API.
+    Uses new PDF parser and 1C integrator.
+    """
     try:
-        # Read file
+        # Check file exists
         file_path = Path(record.file_path)
         if not file_path.exists():
             await log_audit(
@@ -29,47 +34,43 @@ async def send_to_1c(
             )
             return False
         
-        with open(file_path, "rb") as f:
-            file_content = f.read()
-            file_base64 = base64.b64encode(file_content).decode('utf-8')
+        print(f"[Integrator] Processing {record.file_name}...")
         
-        # Prepare request
-        payload = {
-            "orderNo": record.order_no,
-            "fileBase64": file_base64,
-            "fileName": record.file_name,
-            "sendEmail": True
-        }
+        # Step 1: Parse PDF
+        loop = asyncio.get_event_loop()
+        parsed_data = await loop.run_in_executor(
+            None, 
+            parse_lab_result_pdf, 
+            str(file_path)
+        )
         
-        headers = {
-            "Authorization": f"Bearer {settings.API_1C_TOKEN}",
-            "Content-Type": "application/json"
-        }
+        print(f"[Integrator] ✓ Parsed PDF: {parsed_data.get('patient_name', 'N/A')}")
         
-        # Send request
-        async with httpx.AsyncClient(timeout=settings.API_1C_TIMEOUT) as client:
-            response = await client.post(
-                settings.API_1C_URL,
-                json=payload,
-                headers=headers
-            )
+        # Step 2: Send to 1C
+        integrator = get_1c_integrator()
+        result = await loop.run_in_executor(
+            None,
+            integrator.fill_template,
+            parsed_data
+        )
         
-        if response.status_code == 200:
-            data = response.json()
-            
+        if result.get("success"):
             # Update record
             record.sent_to_1c = True
             record.sent_to_1c_at = datetime.utcnow()
-            record.doc_ref_1c = data.get("docRef")
-            record.patient_email = data.get("email")
+            record.patient_email = parsed_data.get("patient_email", "")
             record.status = "completed"
+            
+            # Save parsed data to record for future reference
+            import json
+            record.error_message = json.dumps(parsed_data, ensure_ascii=False)[:500]
             
             await db.commit()
             
             await log_audit(
                 db, record.id, "send_to_1c", "success",
-                f"Successfully sent to 1C. DocRef: {record.doc_ref_1c}",
-                details=str(data)
+                f"Successfully sent to 1C. Patient: {parsed_data.get('patient_name', 'N/A')}",
+                details=str(result)
             )
             
             print(f"[Integrator] ✓ Sent to 1C: {record.file_name}")
@@ -79,7 +80,8 @@ async def send_to_1c(
             
             return True
         else:
-            raise Exception(f"HTTP {response.status_code}: {response.text}")
+            error_response = result.get("error", "Unknown error")
+            raise Exception(f"1C returned error: {error_response}")
             
     except Exception as e:
         error_msg = str(e)
@@ -90,6 +92,8 @@ async def send_to_1c(
             db, record.id, "send_to_1c", "error",
             f"Failed to send to 1C (attempt {retry_count + 1}): {error_msg}"
         )
+        
+        print(f"[Integrator] ✗ Error: {error_msg}")
         
         # Retry logic
         if retry_count < settings.API_1C_RETRY_COUNT:

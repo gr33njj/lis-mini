@@ -1,8 +1,11 @@
 """Main FastAPI application."""
 import os
+import sys
+import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, List
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Request, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.security import HTTPBearer
@@ -13,7 +16,7 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
-from database import init_db, get_db, FileRecord, AuditLog, User
+from database import init_db, get_db, FileRecord, AuditLog, User, SessionLocal
 from auth import (
     hash_password, verify_password, create_access_token,
     get_current_user, init_admin_user
@@ -25,7 +28,51 @@ from mailer import send_email
 from pdf_parser import parse_lab_result_pdf
 from integrator_1c import get_1c_integrator
 
-app = FastAPI(title="ЛИС МД", description="Система управления лабораторными результатами")
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events."""
+    # Startup
+    logger.info("🚀 Starting ЛИС МД...")
+    
+    # Initialize database
+    await init_db()
+    logger.info("✓ Database initialized")
+    
+    # Create database session
+    app.state.db_session = SessionLocal
+    
+    # Create admin user
+    async with app.state.db_session() as db:
+        await init_admin_user(db)
+    logger.info("✓ Admin user initialized")
+    
+    # Start background tasks
+    await start_watcher()
+    await start_integrator()
+    logger.info("✓ Background services started")
+    
+    logger.info("✓ ЛИС МД started successfully!")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down ЛИС МД...")
+
+
+app = FastAPI(
+    title="ЛИС МД", 
+    description="Система управления лабораторными результатами",
+    lifespan=lifespan
+)
 
 # Setup templates
 templates = Jinja2Templates(directory="templates")
@@ -75,36 +122,6 @@ class RetryRequest(BaseModel):
 class EmailRequest(BaseModel):
     record_id: int
     email: str
-
-
-# Events
-@app.on_event("startup")
-async def create_db_session():
-    """Create database session."""
-    from database import SessionLocal
-    app.state.db_session = SessionLocal
-
-
-@app.on_event("startup")
-async def startup():
-    """Initialize application."""
-    print("🚀 Starting ЛИС МД...")
-
-    # Initialize database
-    await init_db()
-    print("✓ Database initialized")
-
-    # Create admin user
-    async with app.state.db_session() as db:
-        await init_admin_user(db)
-    print("✓ Admin user initialized")
-
-    # Start background tasks
-    await start_watcher()
-    await start_integrator()
-    print("✓ Background services started")
-
-    print("✓ ЛИС МД started successfully!")
 
 
 # Auth endpoints
