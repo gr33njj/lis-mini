@@ -6,6 +6,7 @@
 import requests
 from typing import Dict, Optional
 import os
+import base64
 
 
 class C1Integrator:
@@ -13,10 +14,16 @@ class C1Integrator:
     
     def __init__(self):
         """Инициализация интегратора."""
-        self.base_url = os.getenv("C1_BASE_URL", "http://192.168.100.234/lab")
+        self.base_url = os.getenv("C1_BASE_URL", "http://192.168.100.234/BITtest/hs/lab")
         self.username = os.getenv("C1_USERNAME", "Администратор")
         self.password = os.getenv("C1_PASSWORD", "1234")
         self.timeout = int(os.getenv("C1_TIMEOUT", "30"))
+        
+        # Создаём заголовок Basic Auth вручную для поддержки кириллицы
+        credentials = f"{self.username}:{self.password}"
+        credentials_bytes = credentials.encode('utf-8')
+        base64_credentials = base64.b64encode(credentials_bytes).decode('ascii')
+        self.auth_header = f"Basic {base64_credentials}"
         
     def test_connection(self) -> Dict:
         """
@@ -28,7 +35,7 @@ class C1Integrator:
         try:
             response = requests.get(
                 f"{self.base_url}/test",
-                auth=(self.username, self.password),
+                headers={"Authorization": self.auth_header},
                 timeout=self.timeout
             )
             
@@ -60,8 +67,10 @@ class C1Integrator:
             response = requests.post(
                 f"{self.base_url}/fillTemplate",
                 json=data,
-                auth=(self.username, self.password),
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": self.auth_header
+                },
                 timeout=self.timeout
             )
             
