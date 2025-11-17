@@ -210,5 +210,6 @@ async def process_queue():
 
 async def start_integrator():
     """Start the integrator."""
-    asyncio.create_task(process_queue())
+    task = asyncio.create_task(process_queue())
+    return task
 

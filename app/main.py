@@ -55,17 +55,19 @@ async def lifespan(app: FastAPI):
         await init_admin_user(db)
     logger.info("✓ Admin user initialized")
     
-    # Start background tasks
-    await start_watcher()
-    await start_integrator()
+    # Start background tasks and keep references
+    watcher_task = await start_watcher()
+    integrator_task = await start_integrator()
     logger.info("✓ Background services started")
     
     logger.info("✓ ЛИС МД started successfully!")
     
     yield
     
-    # Shutdown
+    # Shutdown - cancel background tasks
     logger.info("Shutting down ЛИС МД...")
+    watcher_task.cancel()
+    integrator_task.cancel()
 
 
 app = FastAPI(

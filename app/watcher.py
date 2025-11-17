@@ -123,5 +123,6 @@ async def watch_directory():
 
 async def start_watcher():
     """Start the file watcher."""
-    asyncio.create_task(watch_directory())
+    task = asyncio.create_task(watch_directory())
+    return task
 
