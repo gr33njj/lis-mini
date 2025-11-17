@@ -22,6 +22,8 @@ from config import settings
 from watcher import start_watcher
 from integrator import start_integrator, send_to_1c
 from mailer import send_email
+from pdf_parser import parse_lab_result_pdf
+from integrator_1c import get_1c_integrator
 
 app = FastAPI(title="ЛИС МД", description="Система управления лабораторными результатами")
 
@@ -324,6 +326,69 @@ async def get_file(
         media_type="application/pdf",
         filename=record.file_name
     )
+
+
+@app.post("/api/test-pdf-parser")
+async def test_pdf_parser(
+    file_path: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Test PDF parser on a specific file."""
+    try:
+        from pathlib import Path
+        if not Path(file_path).exists():
+            raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+        
+        result = parse_lab_result_pdf(file_path)
+        return {
+            "success": True,
+            "file_path": file_path,
+            "parsed_data": result
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.post("/api/test-1c-connection")
+async def test_1c_connection(current_user: User = Depends(get_current_user)):
+    """Test 1C connection."""
+    integrator = get_1c_integrator()
+    result = integrator.test_connection()
+    return result
+
+
+@app.post("/api/test-full-chain")
+async def test_full_chain(
+    file_path: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Test full chain: PDF → Parse → Send to 1C."""
+    try:
+        from pathlib import Path
+        if not Path(file_path).exists():
+            raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+        
+        # 1. Parse PDF
+        parsed_data = parse_lab_result_pdf(file_path)
+        
+        # 2. Send to 1C
+        integrator = get_1c_integrator()
+        send_result = integrator.fill_template(parsed_data)
+        
+        return {
+            "success": send_result.get("success", False),
+            "file_path": file_path,
+            "parsed_data": parsed_data,
+            "send_to_1c_result": send_result
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
 # Static files (no auth required)
