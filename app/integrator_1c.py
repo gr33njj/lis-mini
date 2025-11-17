@@ -95,6 +95,52 @@ class C1Integrator:
                 "success": False,
                 "error": str(e)
             }
+    
+    def create_appointment(self, data: Dict) -> Dict:
+        """
+        Создаёт документ "Прием" в 1С с заполненным шаблоном анализа.
+        
+        Args:
+            data: Словарь с данными (patient_name, age, gender, test_results, etc.)
+            
+        Returns:
+            Dict с результатом операции
+        """
+        try:
+            print(f"[INFO] Создание приема в 1С для пациента: {data.get('patient_name', 'N/A')}")
+            
+            response = requests.post(
+                f"{self.base_url}/createAppointment",
+                json=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": self.auth_header
+                },
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                result = response.json() if response.text else {}
+                print(f"[SUCCESS] Прием создан в 1С: {result.get('appointment_ref', 'N/A')}")
+                return {
+                    "success": True,
+                    "status_code": response.status_code,
+                    "response": result
+                }
+            else:
+                print(f"[ERROR] 1С вернула ошибку: {response.status_code} - {response.text}")
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": response.text
+                }
+                
+        except Exception as e:
+            print(f"[ERROR] Ошибка при создании приема в 1С: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 
 # Singleton instance

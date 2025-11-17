@@ -1,6 +1,7 @@
 """1C Integration module."""
 import asyncio
 import base64
+import os
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -48,11 +49,22 @@ async def send_to_1c(
         
         # Step 2: Send to 1C
         integrator = get_1c_integrator()
-        result = await loop.run_in_executor(
-            None,
-            integrator.fill_template,
-            parsed_data
-        )
+        
+        # Выбираем метод интеграции (createAppointment или fillTemplate)
+        integration_mode = os.getenv("C1_INTEGRATION_MODE", "createAppointment")
+        
+        if integration_mode == "createAppointment":
+            result = await loop.run_in_executor(
+                None,
+                integrator.create_appointment,
+                parsed_data
+            )
+        else:
+            result = await loop.run_in_executor(
+                None,
+                integrator.fill_template,
+                parsed_data
+            )
         
         if result.get("success"):
             # Update record
@@ -195,16 +207,29 @@ async def process_queue():
                 )
                 pending_records = result.scalars().all()
                 
+                count = len(pending_records)
+                if count > 0:
+                    print(f"[Integrator] Found {count} pending file(s)")
+                
                 for record in pending_records:
+                    print(f"[Integrator] Processing file: {record.file_name} (id={record.id})")
                     record.status = "processing"
                     await db.commit()
                     
-                    await send_to_1c(record, db)
+                    try:
+                        success = await send_to_1c(record, db)
+                        print(f"[Integrator] File {record.file_name}: {'SUCCESS' if success else 'FAILED'}")
+                    except Exception as e:
+                        print(f"[Integrator] EXCEPTION processing {record.file_name}: {e}")
+                        import traceback
+                        traceback.print_exc()
             
             await asyncio.sleep(5)  # Check queue every 5 seconds
             
         except Exception as e:
             print(f"[Integrator] Error in queue processing: {e}")
+            import traceback
+            traceback.print_exc()
             await asyncio.sleep(10)
 
 
