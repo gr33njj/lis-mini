@@ -109,9 +109,22 @@ class C1Integrator:
         try:
             print(f"[INFO] Создание приема в 1С для пациента: {data.get('patient_name', 'N/A')}")
             
+            # Преобразуем test_results из dict в массив для совместимости со старыми версиями 1С
+            # Было: {"uuid1": "value1", "uuid2": "value2"}
+            # Стало: [{"parameter_id": "uuid1", "value": "value1"}, ...]
+            modified_data = data.copy()
+            if "test_results" in modified_data and isinstance(modified_data["test_results"], dict):
+                test_results_array = []
+                for param_id, value in modified_data["test_results"].items():
+                    test_results_array.append({
+                        "parameter_id": param_id,
+                        "value": value
+                    })
+                modified_data["test_results"] = test_results_array
+            
             response = requests.post(
                 f"{self.base_url}/createAppointment",
-                json=data,
+                json=modified_data,
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": self.auth_header
