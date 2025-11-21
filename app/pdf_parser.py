@@ -137,50 +137,14 @@ class LabResultParser:
             # 3. Парсим результаты из текста (если таблиц нет)
             self._parse_text_results()
             
-            # 4. Извлекаем даты из PDF (дата взятия пробы, дата результата)
-            self._parse_dates_from_pdf()
-            
-            # 5. Пытаемся определить пол из PDF (если есть)
-            self._parse_gender_from_pdf()
+            # 4. ❗ ИЗ PDF БЕРЁМ ТОЛЬКО РЕЗУЛЬТАТЫ АНАЛИЗОВ!
+            # Даты, пол и прочее - НЕ извлекаем из PDF
             
             return self.results
             
         except Exception as e:
             raise Exception(f"Ошибка при парсинге PDF: {str(e)}")
     
-    def _parse_dates_from_pdf(self):
-        """Извлекает даты из PDF (дата взятия пробы, дата результата)."""
-        date_pattern = r'(\d{2}\.\d{2}\.\d{4})'
-        dates = re.findall(date_pattern, self.raw_text)
-        
-        # Фильтруем даты - исключаем дату рождения
-        birth_date = self.results.get('birth_date', '')
-        pdf_dates = [d for d in dates if d != birth_date]
-        
-        # Первая дата - обычно дата результата
-        if len(pdf_dates) >= 1 and 'result_date' not in self.results:
-            self.results['result_date'] = pdf_dates[0]
-        
-        # Вторая дата - дата взятия пробы
-        if len(pdf_dates) >= 2 and 'sample_date' not in self.results:
-            self.results['sample_date'] = pdf_dates[1]
-        
-        # Если нет дат в PDF - используем текущую дату
-        if 'result_date' not in self.results:
-            self.results['result_date'] = datetime.now().strftime("%d.%m.%Y")
-        if 'sample_date' not in self.results:
-            self.results['sample_date'] = datetime.now().strftime("%d.%m.%Y")
-    
-    def _parse_gender_from_pdf(self):
-        """Извлекает пол из PDF (если указан)."""
-        if 'gender' not in self.results or not self.results['gender']:
-            if 'Женский' in self.raw_text or 'Жен' in self.raw_text or 'Female' in self.raw_text:
-                self.results['gender'] = 'Женский'
-            elif 'Мужской' in self.raw_text or 'Муж' in self.raw_text or 'Male' in self.raw_text:
-                self.results['gender'] = 'Мужской'
-            else:
-                # По умолчанию, если не указано
-                self.results['gender'] = ''
     
     def _parse_tables(self, tables: List):
         """
@@ -256,19 +220,24 @@ class LabResultParser:
         """
         Возвращает данные в формате для отправки в 1С.
         
+        ИЗ ИМЕНИ ФАЙЛА:
+        - patient_name (ФИО)
+        - birth_date (дата рождения)
+        - age (возраст - вычисляется)
+        
+        ИЗ PDF:
+        - test_results (ТОЛЬКО результаты анализов!)
+        
         Returns:
             Словарь с данными для 1С API
         """
         # Список мета-полей, которые не являются результатами анализов
-        meta_fields = ['patient_name', 'birth_date', 'age', 'gender', 'result_date', 'sample_date']
+        meta_fields = ['patient_name', 'birth_date', 'age']
         
         return {
             "patient_name": self.results.get('patient_name', ''),
             "birth_date": self.results.get('birth_date', ''),
             "age": self.results.get('age', ''),
-            "gender": self.results.get('gender', ''),
-            "result_date": self.results.get('result_date', ''),
-            "sample_date": self.results.get('sample_date', ''),
             "test_results": {
                 field_id: value 
                 for field_id, value in self.results.items() 
