@@ -1,10 +1,13 @@
 """
 Парсер PDF файлов с результатами анализов.
 Извлекает структурированные данные из PDF для отправки в 1С.
+ФИО и дата рождения извлекаются из имени файла.
 """
 
 import re
+import os
 from typing import Dict, List, Optional
+from pathlib import Path
 import pdfplumber
 from datetime import datetime
 
@@ -52,20 +55,75 @@ class LabResultParser:
         Инициализация парсера.
         
         Args:
-            pdf_path: Путь к PDF файлу
+            pdf_path: Путь к PDF файлу (формат: "Фамилия Имя Отчество ДД.ММ.ГГГГ.pdf")
         """
         self.pdf_path = pdf_path
         self.raw_text = ""
         self.results: Dict = {}
+    
+    def _parse_filename(self) -> Dict:
+        """
+        Извлекает ФИО и дату рождения из имени файла.
+        
+        Формат: "Тестов Тест Тестович 12.12.1999.pdf"
+        
+        Returns:
+            Словарь с patient_name и birth_date
+        """
+        filename = Path(self.pdf_path).stem  # Имя без расширения
+        
+        # Паттерн: ФИО (слова) + дата (ДД.ММ.ГГГГ)
+        # Например: "Тестов Тест Тестович 12.12.1999"
+        pattern = r'^(.+?)\s+(\d{2}\.\d{2}\.\d{4})$'
+        match = re.match(pattern, filename)
+        
+        if match:
+            full_name = match.group(1).strip()
+            birth_date = match.group(2)
+            
+            # Вычисляем возраст
+            try:
+                birth_datetime = datetime.strptime(birth_date, "%d.%m.%Y")
+                today = datetime.now()
+                age = today.year - birth_datetime.year
+                if today.month < birth_datetime.month or (today.month == birth_datetime.month and today.day < birth_datetime.day):
+                    age -= 1
+                age_str = str(age)
+            except:
+                age_str = ""
+            
+            return {
+                'patient_name': full_name,
+                'birth_date': birth_date,
+                'age': age_str
+            }
+        else:
+            # Если формат не соответствует, пробуем извлечь хотя бы ФИО
+            # Убираем даты и цифры
+            name_clean = re.sub(r'\d{2}\.\d{2}\.\d{4}', '', filename).strip()
+            name_clean = re.sub(r'[_\-]', ' ', name_clean).strip()
+            
+            return {
+                'patient_name': name_clean if name_clean else filename,
+                'birth_date': '',
+                'age': ''
+            }
         
     def parse(self) -> Dict:
         """
         Парсит PDF и извлекает данные.
+        ФИО и дата рождения берутся из имени файла.
+        Из PDF извлекаются только результаты анализов.
         
         Returns:
             Словарь с распарсенными данными
         """
         try:
+            # 1. ИЗВЛЕКАЕМ ФИО И ДАТУ РОЖДЕНИЯ ИЗ ИМЕНИ ФАЙЛА
+            filename_data = self._parse_filename()
+            self.results.update(filename_data)
+            
+            # 2. ИЗВЛЕКАЕМ РЕЗУЛЬТАТЫ АНАЛИЗОВ ИЗ PDF
             with pdfplumber.open(self.pdf_path) as pdf:
                 # Извлекаем текст со всех страниц
                 for page in pdf.pages:
@@ -76,59 +134,53 @@ class LabResultParser:
                     if tables:
                         self._parse_tables(tables)
             
-            # Извлекаем мета-информацию
-            self._parse_metadata()
-            
-            # Парсим результаты из текста (если таблиц нет)
+            # 3. Парсим результаты из текста (если таблиц нет)
             self._parse_text_results()
+            
+            # 4. Извлекаем даты из PDF (дата взятия пробы, дата результата)
+            self._parse_dates_from_pdf()
+            
+            # 5. Пытаемся определить пол из PDF (если есть)
+            self._parse_gender_from_pdf()
             
             return self.results
             
         except Exception as e:
             raise Exception(f"Ошибка при парсинге PDF: {str(e)}")
     
-    def _parse_metadata(self):
-        """Извлекает мета-информацию о пациенте из текста."""
-        lines = self.raw_text.split('\n')
-        
-        # Ищем имя пациента
-        for line in lines:
-            if 'Назван' in line or 'Пациент' in line:
-                # Пробуем извлечь ФИО
-                parts = line.split()
-                if len(parts) >= 2:
-                    # Извлекаем следующие слова как ФИО
-                    name_idx = -1
-                    for i, part in enumerate(parts):
-                        if 'Назван' in part or 'Пациент' in part:
-                            name_idx = i
-                            break
-                    if name_idx >= 0 and len(parts) > name_idx + 1:
-                        name_parts = []
-                        for i in range(name_idx + 1, min(name_idx + 4, len(parts))):
-                            if parts[i] and not parts[i].isdigit():
-                                name_parts.append(parts[i])
-                        if name_parts:
-                            self.results['patient_name'] = ' '.join(name_parts)
-        
-        # Ищем возраст
-        age_match = re.search(r'(\d+)\s*[Гг]од', self.raw_text)
-        if age_match:
-            self.results['age'] = age_match.group(1)
-        
-        # Ищем пол
-        if 'Женский' in self.raw_text or 'Жен' in self.raw_text:
-            self.results['gender'] = 'Женский'
-        elif 'Мужской' in self.raw_text or 'Муж' in self.raw_text:
-            self.results['gender'] = 'Мужской'
-        
-        # Ищем даты
+    def _parse_dates_from_pdf(self):
+        """Извлекает даты из PDF (дата взятия пробы, дата результата)."""
         date_pattern = r'(\d{2}\.\d{2}\.\d{4})'
         dates = re.findall(date_pattern, self.raw_text)
-        if len(dates) >= 1:
-            self.results['result_date'] = dates[0]
-        if len(dates) >= 2:
-            self.results['sample_date'] = dates[1]
+        
+        # Фильтруем даты - исключаем дату рождения
+        birth_date = self.results.get('birth_date', '')
+        pdf_dates = [d for d in dates if d != birth_date]
+        
+        # Первая дата - обычно дата результата
+        if len(pdf_dates) >= 1 and 'result_date' not in self.results:
+            self.results['result_date'] = pdf_dates[0]
+        
+        # Вторая дата - дата взятия пробы
+        if len(pdf_dates) >= 2 and 'sample_date' not in self.results:
+            self.results['sample_date'] = pdf_dates[1]
+        
+        # Если нет дат в PDF - используем текущую дату
+        if 'result_date' not in self.results:
+            self.results['result_date'] = datetime.now().strftime("%d.%m.%Y")
+        if 'sample_date' not in self.results:
+            self.results['sample_date'] = datetime.now().strftime("%d.%m.%Y")
+    
+    def _parse_gender_from_pdf(self):
+        """Извлекает пол из PDF (если указан)."""
+        if 'gender' not in self.results or not self.results['gender']:
+            if 'Женский' in self.raw_text or 'Жен' in self.raw_text or 'Female' in self.raw_text:
+                self.results['gender'] = 'Женский'
+            elif 'Мужской' in self.raw_text or 'Муж' in self.raw_text or 'Male' in self.raw_text:
+                self.results['gender'] = 'Мужской'
+            else:
+                # По умолчанию, если не указано
+                self.results['gender'] = ''
     
     def _parse_tables(self, tables: List):
         """
@@ -207,8 +259,12 @@ class LabResultParser:
         Returns:
             Словарь с данными для 1С API
         """
+        # Список мета-полей, которые не являются результатами анализов
+        meta_fields = ['patient_name', 'birth_date', 'age', 'gender', 'result_date', 'sample_date']
+        
         return {
             "patient_name": self.results.get('patient_name', ''),
+            "birth_date": self.results.get('birth_date', ''),
             "age": self.results.get('age', ''),
             "gender": self.results.get('gender', ''),
             "result_date": self.results.get('result_date', ''),
@@ -216,7 +272,7 @@ class LabResultParser:
             "test_results": {
                 field_id: value 
                 for field_id, value in self.results.items() 
-                if field_id not in ['patient_name', 'age', 'gender', 'result_date', 'sample_date']
+                if field_id not in meta_fields
             }
         }
 
