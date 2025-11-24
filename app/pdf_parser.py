@@ -16,27 +16,82 @@ class LabResultParser:
     """Парсер для PDF файлов с результатами лабораторных анализов."""
     
     # Маппинг показателей на ID в HTML шаблоне 1С
+    # Включает различные варианты написания
     FIELD_MAPPING = {
+        # АЛАТ
         "АЛАТ": "ae584a2f-957f-11f0-a7be-eca0f0014d7d",
+        "АЛТ": "ae584a2f-957f-11f0-a7be-eca0f0014d7d",
+        
+        # АСАТ
         "АСАТ": "d284601d-957f-11f0-a7be-eca0f0014d7d",
+        "АСТ": "d284601d-957f-11f0-a7be-eca0f0014d7d",
+        
+        # Холестерин
         "Холестерин": "e5e808bc-957f-11f0-a7be-eca0f0014d7d",
+        "Холестерин общий": "e5e808bc-957f-11f0-a7be-eca0f0014d7d",
+        
+        # Гамма-ГТ
         "Гамма-ГТ": "ef9d787d-957f-11f0-a7be-eca0f0014d7d",
         "гамма-ГТ": "ef9d787d-957f-11f0-a7be-eca0f0014d7d",
+        "ГГТ": "ef9d787d-957f-11f0-a7be-eca0f0014d7d",
+        
+        # Щелочная фосфатаза
         "Щелочн. фосф-за": "0190f459-9580-11f0-a7be-eca0f0014d7d",
+        "Щелочная фосфатаза": "0190f459-9580-11f0-a7be-eca0f0014d7d",
+        "Щелочн фосф-за": "0190f459-9580-11f0-a7be-eca0f0014d7d",
+        "Щелочн. фосфатаза": "0190f459-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Триглицериды
         "Триглицериды": "0bf4b4f9-9580-11f0-a7be-eca0f0014d7d",
+        "ТГ": "0bf4b4f9-9580-11f0-a7be-eca0f0014d7d",
+        
+        # ЛПВП
         "ЛПВП": "19dd5baa-9580-11f0-a7be-eca0f0014d7d",
+        "ХС-ЛПВП": "19dd5baa-9580-11f0-a7be-eca0f0014d7d",
+        
+        # ЛПНП
         "ЛПНП": "3b7519c0-9580-11f0-a7be-eca0f0014d7d",
+        "ХС-ЛПНП": "3b7519c0-9580-11f0-a7be-eca0f0014d7d",
+        
+        # ЛДГ
         "ЛДГ": "43f2ce34-9580-11f0-a7be-eca0f0014d7d",
+        "Лактатдегидрогеназа": "43f2ce34-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Мочевина
         "Мочевина": "4b6251cb-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Альфа-Амилаза
         "Альфа-Амилаза": "562a56ba-9580-11f0-a7be-eca0f0014d7d",
         "альфа-Амилаза": "562a56ba-9580-11f0-a7be-eca0f0014d7d",
+        "α-Амилаза": "562a56ba-9580-11f0-a7be-eca0f0014d7d",
+        "Амилаза": "562a56ba-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Билирубин общий
         "Билирубин общий": "62c0a29c-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Билирубин прямой
         "Билирубин прямой": "681a2d53-9580-11f0-a7be-eca0f0014d7d",
+        "Билирубин прям.": "681a2d53-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Кальций
         "Кальций": "740e37da-9580-11f0-a7be-eca0f0014d7d",
+        "Ca": "740e37da-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Креатинин
         "Креатинин": "8007eafe-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Глюкоза
         "Глюкоза": "8bf99265-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Общий белок
         "Общий белок": "97ee2791-9580-11f0-a7be-eca0f0014d7d",
+        "Белок общий": "97ee2791-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Железо
         "Железо": "9decbf26-9580-11f0-a7be-eca0f0014d7d",
+        "Fe": "9decbf26-9580-11f0-a7be-eca0f0014d7d",
+        
+        # Мочевая кислота
         "Мочевая кислота": "bc144e0a-a67f-11f0-a7d7-d01c04d652e6",
     }
     
@@ -119,30 +174,67 @@ class LabResultParser:
             Словарь с распарсенными данными
         """
         try:
+            print(f"\n{'='*60}")
+            print(f"📄 ПАРСИНГ PDF: {Path(self.pdf_path).name}")
+            print(f"{'='*60}\n")
+            
             # 1. ИЗВЛЕКАЕМ ФИО И ДАТУ РОЖДЕНИЯ ИЗ ИМЕНИ ФАЙЛА
+            print("📝 Шаг 1: Извлечение данных из имени файла")
             filename_data = self._parse_filename()
             self.results.update(filename_data)
+            print(f"✅ ФИО: {filename_data.get('patient_name')}")
+            print(f"✅ Дата рождения: {filename_data.get('birth_date')}")
+            print(f"✅ Возраст: {filename_data.get('age')}\n")
             
             # 2. ИЗВЛЕКАЕМ РЕЗУЛЬТАТЫ АНАЛИЗОВ ИЗ PDF
+            print("📊 Шаг 2: Извлечение результатов анализов из PDF")
             with pdfplumber.open(self.pdf_path) as pdf:
+                print(f"Страниц в PDF: {len(pdf.pages)}\n")
+                
                 # Извлекаем текст со всех страниц
-                for page in pdf.pages:
-                    self.raw_text += page.extract_text() + "\n"
+                for page_num, page in enumerate(pdf.pages, 1):
+                    print(f"--- Страница {page_num} ---")
+                    page_text = page.extract_text()
+                    self.raw_text += page_text + "\n"
+                    
+                    # DEBUG: Показываем первые 500 символов текста
+                    print(f"Текст (первые 500 символов):")
+                    print(page_text[:500] if page_text else "ПУСТО")
+                    print()
                     
                     # Пробуем извлечь таблицы
                     tables = page.extract_tables()
                     if tables:
+                        print(f"Таблицы: найдено {len(tables)}")
                         self._parse_tables(tables)
+                    else:
+                        print("Таблицы: НЕ НАЙДЕНО")
             
             # 3. Парсим результаты из текста (если таблиц нет)
+            print("\n📝 Шаг 3: Попытка парсинга из текста")
+            initial_count = len([k for k in self.results.keys() if k not in ['patient_name', 'birth_date', 'age']])
             self._parse_text_results()
+            final_count = len([k for k in self.results.keys() if k not in ['patient_name', 'birth_date', 'age']])
             
-            # 4. ❗ ИЗ PDF БЕРЁМ ТОЛЬКО РЕЗУЛЬТАТЫ АНАЛИЗОВ!
-            # Даты, пол и прочее - НЕ извлекаем из PDF
+            if final_count > initial_count:
+                print(f"✅ Извлечено дополнительно: {final_count - initial_count} показателей")
+            
+            # 4. ИТОГОВАЯ СТАТИСТИКА
+            test_results_count = len([k for k in self.results.keys() if k not in ['patient_name', 'birth_date', 'age']])
+            print(f"\n{'='*60}")
+            print(f"📈 ИТОГО: Извлечено {test_results_count} показателей")
+            print(f"{'='*60}\n")
+            
+            if test_results_count == 0:
+                print("⚠️ ВНИМАНИЕ: Не извлечено НИ ОДНОГО показателя!")
+                print("Проверьте формат таблицы в PDF\n")
             
             return self.results
             
         except Exception as e:
+            print(f"❌ ОШИБКА: {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise Exception(f"Ошибка при парсинге PDF: {str(e)}")
     
     
@@ -153,32 +245,67 @@ class LabResultParser:
         Args:
             tables: Список таблиц, извлеченных из PDF
         """
-        for table in tables:
-            for row in table:
-                if not row or len(row) < 2:
+        print(f"DEBUG: Найдено таблиц: {len(tables)}")
+        
+        for table_idx, table in enumerate(tables):
+            print(f"\nDEBUG: Таблица {table_idx + 1}, строк: {len(table)}")
+            
+            for row_idx, row in enumerate(table):
+                if not row:
                     continue
                 
-                # Первая колонка - название показателя
-                test_name = str(row[0]).strip() if row[0] else ""
+                print(f"DEBUG: Строка {row_idx}: {row}")
                 
-                # Вторая колонка - результат
-                result_value = str(row[1]).strip() if len(row) > 1 and row[1] else ""
-                
-                # Пропускаем заголовки и пустые строки
-                if not test_name or not result_value:
-                    continue
-                if 'Исследование' in test_name or 'Резул' in test_name:
-                    continue
-                if 'Хим' in test_name:  # Пропускаем заголовок типа анализа
+                # Пропускаем заголовки
+                if row_idx == 0 and any(h in str(row) for h in ['Резул', 'Ед из', 'Реф', 'Хим']):
+                    print(f"DEBUG: Пропуск заголовка")
                     continue
                 
-                # Нормализуем название показателя
-                test_name = self._normalize_test_name(test_name)
+                # Ищем название показателя и значение
+                test_name = None
+                result_value = None
                 
-                # Ищем соответствие в маппинге
-                if test_name in self.FIELD_MAPPING:
-                    field_id = self.FIELD_MAPPING[test_name]
-                    self.results[field_id] = result_value
+                # Проверяем все колонки
+                for col_idx, cell in enumerate(row):
+                    if not cell:
+                        continue
+                    
+                    cell_str = str(cell).strip()
+                    
+                    # Если в ячейке только цифра - это может быть номер строки
+                    if col_idx == 0 and cell_str.isdigit():
+                        continue
+                    
+                    # Если ячейка содержит название показателя (буквы кириллицы)
+                    if re.search(r'[А-Яа-яЁё]', cell_str) and not test_name:
+                        # Убираем номер строки в начале (если есть)
+                        test_name = re.sub(r'^\d+\.?\s*', '', cell_str).strip()
+                        print(f"DEBUG: Найдено название: '{test_name}' в колонке {col_idx}")
+                        continue
+                    
+                    # Если ячейка содержит число (результат)
+                    if re.match(r'^\d+\.?\d*$', cell_str) and test_name and not result_value:
+                        result_value = cell_str
+                        print(f"DEBUG: Найдено значение: '{result_value}' в колонке {col_idx}")
+                        break
+                
+                # Если нашли и название, и значение
+                if test_name and result_value:
+                    # Нормализуем название
+                    test_name_normalized = self._normalize_test_name(test_name)
+                    print(f"DEBUG: Нормализованное название: '{test_name_normalized}'")
+                    
+                    # Ищем в маппинге
+                    if test_name_normalized in self.FIELD_MAPPING:
+                        field_id = self.FIELD_MAPPING[test_name_normalized]
+                        self.results[field_id] = result_value
+                        print(f"✅ DEBUG: Сохранено: {test_name_normalized} = {result_value} (ID: {field_id})")
+                    else:
+                        print(f"⚠️ DEBUG: Показатель '{test_name_normalized}' НЕ найден в маппинге")
+                        print(f"   Доступные ключи: {list(self.FIELD_MAPPING.keys())}")
+                else:
+                    if row_idx > 0:  # Не для заголовков
+                        print(f"⚠️ DEBUG: Не удалось извлечь данные из строки")
     
     def _parse_text_results(self):
         """Парсит результаты анализов из текста (когда нет таблиц)."""
