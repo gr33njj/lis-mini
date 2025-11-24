@@ -309,21 +309,44 @@ class LabResultParser:
     
     def _parse_text_results(self):
         """Парсит результаты анализов из текста (когда нет таблиц)."""
-        # Паттерн: "1. Глюкоза 6.61 ↑ ммоль/л 3.9-6.4"
-        # Формат: номер. Название Значение [стрелка] единицы референс
-        pattern = r'(\d+)\.\s+([А-Яа-яёЁ\s\-\.]+?)\s+([\d\.]+)\s*[↑↓]?\s+([\wА-Яа-я/]+)\s+([\d\.\-\sМЖ]+)'
+        # Несколько паттернов для разных форматов
         
-        for match in re.finditer(pattern, self.raw_text):
-            test_name = match.group(2).strip()
-            result_value = match.group(3).strip()
-            
-            # Нормализуем название
-            test_name = self._normalize_test_name(test_name)
-            
-            # Ищем соответствие в маппинге
-            if test_name in self.FIELD_MAPPING:
-                field_id = self.FIELD_MAPPING[test_name]
-                self.results[field_id] = result_value
+        # Паттерн 1: "3. Холестерин 0.31 ммоль/л 0-5.2"
+        # Формат: номер. Название Значение единицы референс
+        pattern1 = r'(\d+)\.?\s+([А-Яа-яёЁ\-\.]+(?:\s+[А-Яа-яёЁ\-\.]+)*)\s+([\d\.]+)\s*[↑↓]?\s+([\wА-Яа-я/]+)'
+        
+        # Паттерн 2: "12 Билирубин общий 0.00 ↓ ммоль/л"
+        # Формат: номер Название Значение [стрелка] единицы
+        pattern2 = r'(\d+)\s+([А-Яа-яёЁ\-\.]+(?:\s+[А-Яа-яёЁ\-\.]+)*)\s+([\d\.]+)\s*[↑↓]?'
+        
+        print(f"\nDEBUG: Парсинг текста ({len(self.raw_text)} символов)")
+        
+        patterns = [pattern1, pattern2]
+        found_count = 0
+        
+        for pattern_idx, pattern in enumerate(patterns, 1):
+            print(f"DEBUG: Паттерн {pattern_idx}")
+            for match in re.finditer(pattern, self.raw_text):
+                test_name = match.group(2).strip()
+                result_value = match.group(3).strip()
+                
+                print(f"  Найдено: '{test_name}' = '{result_value}'")
+                
+                # Нормализуем название
+                test_name_normalized = self._normalize_test_name(test_name)
+                
+                # Ищем соответствие в маппинге
+                if test_name_normalized in self.FIELD_MAPPING:
+                    field_id = self.FIELD_MAPPING[test_name_normalized]
+                    # Не перезаписываем, если уже есть
+                    if field_id not in self.results:
+                        self.results[field_id] = result_value
+                        found_count += 1
+                        print(f"  ✅ Сохранено: {test_name_normalized} = {result_value}")
+                    else:
+                        print(f"  ⚠️ Пропущено (уже есть): {test_name_normalized}")
+                else:
+                    print(f"  ⚠️ НЕ в маппинге: '{test_name_normalized}'")
     
     def _normalize_test_name(self, name: str) -> str:
         """
