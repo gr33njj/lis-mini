@@ -39,8 +39,7 @@ async def send_to_1c(
             # Отправляем уведомление об ошибке
             await notify_error(
                 patient_name="Неизвестно",
-                error_text=error_msg,
-                file_name=record.file_name
+                error_text=error_msg
             )
             return False
         
@@ -143,8 +142,7 @@ async def send_to_1c(
             # ⭐ НОВОЕ: Отправляем Telegram уведомление об ошибке
             await notify_error(
                 patient_name=patient_name if patient_name else "Неизвестно",
-                error_text=error_msg,
-                file_name=record.file_name
+                error_text=error_msg
             )
             
             print(f"[Integrator] ✗ Failed after {settings.API_1C_RETRY_COUNT} attempts: {record.file_name}")

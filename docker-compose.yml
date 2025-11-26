@@ -24,6 +24,8 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - SMTP_FROM=${SMTP_FROM:-noreply@it-mydoc.ru}
       - SECRET_KEY=${SECRET_KEY:-changeme-secret-key-for-production}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
     depends_on:
       - nginx
     networks:

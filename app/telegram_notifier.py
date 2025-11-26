@@ -86,8 +86,7 @@ class TelegramNotifier:
     def _format_error_message(
         self,
         patient_name: str,
-        error_text: str,
-        file_name: str = ""
+        error_text: str
     ) -> str:
         """
         Форматирует сообщение об ошибке.
@@ -95,7 +94,6 @@ class TelegramNotifier:
         Args:
             patient_name: ФИО пациента
             error_text: Текст ошибки
-            file_name: Имя файла (опционально)
             
         Returns:
             Отформатированное сообщение
@@ -104,10 +102,6 @@ class TelegramNotifier:
         
         message = f"❌ <b>ОШИБКА ЗАГРУЗКИ</b>\n\n"
         message += f"👤 Пациент: <code>{initials}</code>\n"
-        
-        if file_name:
-            message += f"📁 Файл: <code>{file_name}</code>\n"
-        
         message += f"\n⚠️ <b>Ошибка:</b>\n<pre>{error_text[:500]}</pre>"
         
         return message
@@ -161,8 +155,7 @@ class TelegramNotifier:
     async def send_error(
         self,
         patient_name: str,
-        error_text: str,
-        file_name: str = ""
+        error_text: str
     ) -> bool:
         """
         Отправляет уведомление об ошибке загрузки документа.
@@ -170,7 +163,6 @@ class TelegramNotifier:
         Args:
             patient_name: ФИО пациента
             error_text: Текст ошибки
-            file_name: Имя файла (опционально)
             
         Returns:
             True если сообщение отправлено, False в противном случае
@@ -181,8 +173,7 @@ class TelegramNotifier:
         try:
             message = self._format_error_message(
                 patient_name,
-                error_text,
-                file_name
+                error_text
             )
             
             await self.bot.send_message(
@@ -239,15 +230,13 @@ async def notify_success(
 
 async def notify_error(
     patient_name: str,
-    error_text: str,
-    file_name: str = ""
+    error_text: str
 ) -> bool:
     """Отправляет уведомление об ошибке."""
     notifier = get_notifier()
     return await notifier.send_error(
         patient_name,
-        error_text,
-        file_name
+        error_text
     )
 
 
@@ -280,8 +269,7 @@ if __name__ == "__main__":
         print("\n2. Тест уведомления об ошибке...")
         success = await notifier.send_error(
             patient_name="Иванов Иван Иванович",
-            error_text="Пациент не найден в базе данных 1С",
-            file_name="БХ Иванов Иван Иванович 01.01.1980.pdf"
+            error_text="Пациент не найден в базе данных 1С"
         )
         print(f"   Результат: {'✅ OK' if success else '❌ FAIL'}")
         
