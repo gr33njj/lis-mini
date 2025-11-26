@@ -1,4 +1,4 @@
-"""1C Integration module."""
+"""1C Integration module with Telegram notifications."""
 import asyncio
 import base64
 import os
@@ -14,6 +14,7 @@ from config import settings
 from watcher import log_audit
 from pdf_parser import parse_lab_result_pdf
 from integrator_1c import get_1c_integrator
+from telegram_notifier import notify_success, notify_error
 
 
 async def send_to_1c(
@@ -24,14 +25,22 @@ async def send_to_1c(
     """
     Parse PDF and send data to 1C via HTTP API.
     Uses new PDF parser and 1C integrator.
+    Sends Telegram notifications on success/error.
     """
+    patient_name = ""
     try:
         # Check file exists
         file_path = Path(record.file_path)
         if not file_path.exists():
+            error_msg = f"File not found: {record.file_path}"
             await log_audit(
-                db, record.id, "send_to_1c", "error",
-                f"File not found: {record.file_path}"
+                db, record.id, "send_to_1c", "error", error_msg
+            )
+            # Отправляем уведомление об ошибке
+            await notify_error(
+                patient_name="Неизвестно",
+                error_text=error_msg,
+                file_name=record.file_name
             )
             return False
         
@@ -45,7 +54,8 @@ async def send_to_1c(
             str(file_path)
         )
         
-        print(f"[Integrator] ✓ Parsed PDF: {parsed_data.get('patient_name', 'N/A')}")
+        patient_name = parsed_data.get('patient_name', 'N/A')
+        print(f"[Integrator] ✓ Parsed PDF: {patient_name}")
         
         # Step 2: Send to 1C
         integrator = get_1c_integrator()
@@ -81,11 +91,23 @@ async def send_to_1c(
             
             await log_audit(
                 db, record.id, "send_to_1c", "success",
-                f"Successfully sent to 1C. Patient: {parsed_data.get('patient_name', 'N/A')}",
+                f"Successfully sent to 1C. Patient: {patient_name}",
                 details=str(result)
             )
             
             print(f"[Integrator] ✓ Sent to 1C: {record.file_name}")
+            
+            # ⭐ НОВОЕ: Отправляем Telegram уведомление об успехе
+            document_number = result.get("appointment_number", "???")
+            template_name = result.get("template", "")
+            parameters_count = result.get("parameters_filled", 0)
+            
+            await notify_success(
+                patient_name=patient_name,
+                document_number=document_number,
+                template_name=template_name,
+                parameters_count=parameters_count
+            )
             
             # Archive file
             await archive_file(record, db)
@@ -117,6 +139,14 @@ async def send_to_1c(
             record.status = "failed"
             await db.commit()
             await move_to_quarantine(record, db)
+            
+            # ⭐ НОВОЕ: Отправляем Telegram уведомление об ошибке
+            await notify_error(
+                patient_name=patient_name if patient_name else "Неизвестно",
+                error_text=error_msg,
+                file_name=record.file_name
+            )
+            
             print(f"[Integrator] ✗ Failed after {settings.API_1C_RETRY_COUNT} attempts: {record.file_name}")
             return False
 
@@ -237,4 +267,3 @@ async def start_integrator():
     """Start the integrator."""
     task = asyncio.create_task(process_queue())
     return task
-
