@@ -62,7 +62,7 @@ class TelegramNotifier:
         
         Args:
             patient_name: ФИО пациента
-            document_number: Номер документа (не используется)
+            document_number: Номер документа из 1С
             template_name: Название шаблона
             parameters_count: Количество заполненных параметров
             
@@ -73,14 +73,12 @@ class TelegramNotifier:
         
         message = f"✅ <b>ДОКУМЕНТ СОЗДАН</b>\n\n"
         message += f"👤 Пациент: <code>{initials}</code>\n"
+        message += f"📄 Документ: <code>№{document_number}</code>\n"
         
         if template_name:
-            message += f"📄 Шаблон: <i>{template_name}</i>\n"
-        else:
-            message += f"📄 Шаблон: <i>не указан</i>\n"
+            message += f"🗂 Шаблон: <i>{template_name}</i>\n"
         
-        if parameters_count > 0:
-            message += f"📊 Параметров: <b>{parameters_count}</b>\n"
+        message += f"📊 Параметров: <b>{parameters_count}</b>\n"
         
         return message
     
